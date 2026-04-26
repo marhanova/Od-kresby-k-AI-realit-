@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Od kresby k AI realitě</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  margin: 0;
+  padding: 20px;
+}
+
+/* ===== LOGA ===== */
+#logo-left {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1000;
+  text-align: center;
+}
+#logo-left img { height: 60px; }
+#logo-left .support-text {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+#logo-right {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  z-index: 1000;
+}
+#logo-right img { height: 60px; }
+
+/* ===== NADPISY ===== */
+h1 { text-align: center; margin-bottom: 5px; }
+h2 { text-align: center; font-size: 18px; color: #555; margin-top: 0; }
+
+/* ===== LEGENDA ===== */
+#legend {
+  max-width: 900px;
+  margin: 0 auto 20px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px 20px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.legend-color {
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  border: 2px solid #333;
+}
+
+/* ===== METODIKA ===== */
+#method {
+  background: #fff;
+  border-left: 6px solid #4a90e2;
+  padding: 20px;
+  margin-bottom: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ===== OVLÁDÁNÍ ===== */
+#mode-bar { text-align: center; margin-bottom: 10px; }
+#teacher-controls { display: none; text-align: center; margin-bottom: 10px; }
+
+/* ===== PLOCHA ===== */
+#board {
+  position: relative;
+  min-height: 120vh;
+}
+
+/* ===== KARTIČKA ===== */
+.item {
+  position: absolute;
+  width: 260px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px;
+  border: 4px solid #2ecc71;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+body.teacher .item { cursor: move; }
+
+.item img {
+  width: 100%;
+  border-radius: 8px;
+}
+
+/* ===== VOLBA BARVY – JEN UČITEL ===== */
+.color-buttons {
+  display: none;
+  gap: 8px;
+  margin-top: 8px;
+}
+body.teacher .color-buttons {
+  display: flex;
+}
+
+.color-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid #333;
+  cursor: pointer;
+}
+.green { background:#2ecc71; }
+.yellow { background:#f1c40f; }
+.red { background:#e74c3c; }
+
+/* ===== TEXT HODNOCENÍ – JEN ŽÁK ===== */
+.rating-text {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* ===== SMAZAT ===== */
+.delete-btn {
+  display: none;
+  font-size: 12px;
+  color: #c0392b;
+  cursor: pointer;
+  text-align: right;
+}
+body.teacher .delete-btn { display: block; }
+
+/* ===== KOMENTÁŘ ===== */
+.text-box {
+  margin-top: 6px;
+  padding: 6px;
+  background: #eee;
+  min-height: 50px;
+}
+body.teacher .text-box { background: #fafafa; }
+</style>
+</head>
+
+<body>
+
+<!-- LOGO O2 -->
+<div id="logo-left">
+  <img src="logo-o2-chytra-skola.png" alt="O2 Chytrá škola">
+  <div class="support-text">Podpořeno z programu O2 Chytrá škola.</div>
+</div>
+
+
+
+<!-- LOGO ŠKOLY -->
+<div id="logo-right">
+  <img src="logo-zs-pastelka.png" alt="ZŠ Pastelka">
+</div>
+
+
+<h1>Od kresby k AI realitě</h1>
+<h2>Jak AI pracovala s naším návrhem aneb limity AI</h2>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#2ecc71"></div>AI výstup odpovídá původnímu návrhu</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f1c40f"></div>AI návrh částečně změnila</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e74c3c"></div>AI výstup je chybný / zavádějící</div>
+</div>
+
+<div id="method">
+<b>Jak jsme pracovali:</b><br>
+Žáci porovnávali původní kreslený obrázek s obrázkem vygenerovaným pomocí umělé inteligence.
+Na základě dotazníku a společné diskuze hodnotili shodu, změny a možné zavádějící prvky.
+Výsledky jsou znázorněny barvou rámečku jednotlivých obrázků.
+</div>
+
+<div id="mode-bar">
+  <button onclick="teacherMode()">Učitelský režim</button>
+  <button onclick="studentMode()">Žákovský režim</button>
+</div>
+
+<div id="teacher-controls">
+  <input type="file" id="imageInput" accept="image/*">
+</div>
+
+<div id="board"></div>
+
+<script>
+const PASSWORD = "ucitelka";
+let isTeacher = false;
+let boardData = [];
+
+const board = document.getElementById("board");
+const imageInput = document.getElementById("imageInput");
+const teacherControls = document.getElementById("teacher-controls");
+
+/* ===== REŽIMY ===== */
+function teacherMode() {
+  if (prompt("Zadej heslo učitele:") !== PASSWORD) return;
+  isTeacher = true;
+  document.body.classList.add("teacher");
+  teacherControls.style.display = "block";
+  renderBoard();
+}
+function studentMode() {
+  isTeacher = false;
+  document.body.classList.remove("teacher");
+  teacherControls.style.display = "none";
+  renderBoard();
+}
+
+/* ===== TEXT PODLE BARVY ===== */
+function ratingText(color) {
+  if (color === "#2ecc71") return "AI výstup odpovídá původnímu návrhu";
+  if (color === "#f1c40f") return "AI návrh částečně změnila";
+  if (color === "#e74c3c") return "AI výstup je chybný / zavádějící";
+  return "";
+}
+
+/* ===== ULOŽENÍ ===== */
+function saveBoard() {
+  localStorage.setItem("ai_nastenka", JSON.stringify(boardData));
+}
+function loadBoard() {
+  const data = localStorage.getItem("ai_nastenka");
+  if (data) boardData = JSON.parse(data);
+}
+loadBoard();
+
+/* ===== PŘIDÁNÍ OBRÁZKU ===== */
+imageInput.addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = ev => {
+    img.onload = () => {
+      const MAX = 800;
+      const scale = MAX / img.width;
+      const canvas = document.createElement("canvas");
+      canvas.width = MAX;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      const optimized = canvas.toDataURL("image/jpeg", 0.7);
+
+      boardData.push({
+        img: optimized,
+        left: "20px",
+        top: (20 + boardData.length * 280) + "px",
+        color: "#2ecc71",
+        text: "Komentář učitele…"
+      });
+
+      saveBoard();
+      renderBoard();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  imageInput.value = "";
+});
+
+/* ===== VYKRESLENÍ ===== */
+function renderBoard() {
+  board.innerHTML = "";
+  boardData.forEach((d, i) => {
+    const item = document.createElement("div");
+    item.className = "item";
+    item.style.left = d.left;
+    item.style.top = d.top;
+    item.style.borderColor = d.color;
+
+    const img = document.createElement("img");
+    img.src = d.img;
+
+    // ===== BLOK PODLE REŽIMU =====
+    let ratingBlock;
+    if (isTeacher) {
+      ratingBlock = document.createElement("div");
+      ratingBlock.className = "color-buttons";
+
+      [
+        {c:"#2ecc71", cls:"green"},
+        {c:"#f1c40f", cls:"yellow"},
+        {c:"#e74c3c", cls:"red"}
+      ].forEach(o=>{
+        const btn=document.createElement("div");
+        btn.className="color-btn "+o.cls;
+        btn.onclick=()=>{
+          d.color=o.c;
+          saveBoard();
+          renderBoard();
+        };
+        ratingBlock.appendChild(btn);
+      });
+
+    } else {
+      ratingBlock = document.createElement("div");
+      ratingBlock.className = "rating-text";
+      ratingBlock.textContent = ratingText(d.color);
+    }
+
+    const del = document.createElement("div");
+    del.className = "delete-btn";
+    del.textContent = "✖ Odstranit";
+    del.onclick = () => {
+      boardData.splice(i, 1);
+      saveBoard();
+      renderBoard();
+    };
+
+    const text = document.createElement("div");
+    text.className = "text-box";
+    text.contentEditable = isTeacher;
+    text.innerText = d.text;
+    text.oninput = () => {
+      d.text = text.innerText;
+      saveBoard();
+    };
+
+    item.append(img, ratingBlock, del, text);
+    board.appendChild(item);
+    if (isTeacher) makeDraggable(item, d);
+  });
+}
+
+/* ===== DRAG ===== */
+function makeDraggable(el, data) {
+  let dx, dy, drag = false;
+  el.onmousedown = e => {
+    if (!isTeacher) return;
+    drag = true;
+    dx = e.clientX - el.offsetLeft;
+    dy = e.clientY - el.offsetTop;
+  };
+  document.onmousemove = e => {
+    if (!drag) return;
+    el.style.left = e.clientX - dx + "px";
+    el.style.top = e.clientY - dy + "px";
+    data.left = el.style.left;
+    data.top = el.style.top;
+  };
+  document.onmouseup = () => {
+    if (drag) {
+      drag = false;
+      saveBoard();
+    }
+  };
+}
+
+renderBoard();
+</script>
+
+</body>
+</html>
+``
